@@ -1,0 +1,416 @@
+<!doctype html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+		<title>Асинхронные этюды</title>
+
+		<link rel="stylesheet" href="css/reveal.css">
+		<link rel="stylesheet" href="css/theme/black.css">
+
+		<!-- Theme used for syntax highlighting of code -->
+		<link rel="stylesheet" href="lib/css/zenburn.css">
+
+		<!-- Printing and PDF exports -->
+		<script>
+			var link = document.createElement( 'link' );
+			link.rel = 'stylesheet';
+			link.type = 'text/css';
+			link.href = window.location.search.match( /print-pdf/gi ) ? 'css/print/pdf.css' : 'css/print/paper.css';
+			document.getElementsByTagName( 'head' )[0].appendChild( link );
+		</script>
+	</head>
+	<body>
+		<div class="reveal" style="font-size: 30px">
+			<div class="slides">
+				<section>
+					<h1>Асинхронные этюды</h1>
+					<p>или</p>
+					<h6>Архитектурные подходы для асинхронных операций в современном фронтенде</h6>
+					<br /><br /><br /><br />
+					<a style="position:absolute; bottom: 0; right: 0px; font-size: 0.6em"
+						href="http://github.com/lexich" target="_blank"
+					>Ефремов Алексей</a>
+				</section>
+				<section>
+					<h1>Зачем?</h1>
+					<span class="fragment fade-right">Асинхронность&nbsp;</span>
+					<span class="fragment fade-right">это&nbsp;</span>
+					<span class="fragment fade-right">боль...</span>
+					<div class="fragment fade-up" style="position: relative">
+						<img width="30%" src="img/pain.jpg" alt="pain">
+						<p style="position: absolute;top: 0;left: 50%;margin-left: -10%;color: black">
+							<span style="margin-left: -18px;">Бусю</span>
+							<span style="margin-left: 25px;">печалит</span>
+						</p>
+						<p style="position: absolute;bottom: 2px;left: 50%;margin-left: -10%;color: black">Асинхронность</p>
+					</div>
+					<p class="fragment fade-up">Если не уметь ее готовить</p>
+				</section>
+				<section>
+					<h1>Выход</h1>
+					<p>правильная архитектура приложения</p>
+					<img class="fragment fade-up" src="img/solution.jpg" width="60%" alt="solution">
+				</section>
+				<section>
+					<h1>Как выбрать?</h1>
+					<div style="position: relative">
+						<img src="img/question.jpg" width="40%" alt="question">
+						<div style="padding-left: 5px; position: absolute; top: 20px; left: 50%; margin-left: -20%; color: greenyellow; text-align: left">Поспать...<br/>Поесть...<br/>Пошалить...</div>
+					</div>
+
+				</section>
+
+				<section data-background-video="img/video.mov" data-background-video-loop="loop" data-background-color="#000000">
+					<div style="background-color: rgba(0, 0, 0, 0.2); color: #fff; padding: 20px;">
+						<h1>Муки выбора</h1>
+					</div>
+				</section>
+
+				<section>
+					<h1>1. Vanila JS</h1>
+					<pre><code class="html" data-trim contenteditable>
+						<div>
+							<span id='name'></span>
+							<span id='status'></span>
+						</div>
+					</code></pre>
+					<pre><code class="hljs" data-trim>
+						fetch('/api/user').then(d => d.json()).then(data => {
+							const name = document.getElementById('name');
+							if (name) {
+								name.innerText = data.name;
+							}
+							const status = document.getElementById('status');
+							if (status) {
+								status.innerText = data.status;
+							}
+						});
+					</code></pre>
+				</section>
+				<section data-markdown>
+					<script type="text/template">
+					# 1.1 Vanila JS (Плюсы)
+					- быстро
+					- понятно
+					- нативно
+					</script>
+				</section>
+				<section data-markdown>
+					<script type="text/template">
+					# 1.2 Vanila JS (Минусы)
+
+					- отсутствие механизмов взаимодействия
+					- сложно поддерживаемое решение
+					- данные не могут быть переиспользованы без велосипедов
+					</script>
+				</section>
+				<section>
+					<h1>2. React with local state</h1>
+					<pre><code class="hljs" data-trim>
+					class User extends React.Component {
+						state = {};
+						componentDidMount() {
+							fetch('/api/user')
+								.then(d => d.json())
+								.then(data => this.setState(data));
+						}
+						render() {
+							return (
+								<div>
+									<span>{this.state.name}</span>
+									<span>{this.state.status}</span>
+								</div>
+							);
+						}
+					}
+					</code></pre>
+				</section>
+				<section data-markdown>
+					<script type="text/template">
+					# 2.1 React with local state (Плюсы)
+
+					- быстро
+					- понятно
+					- решение из коробки
+					</script>
+				</section>
+				<section data-markdown>
+					<script type="text/template">
+					# 2.2 React with local state (Минусы)
+
+					- отсутствие прямых механизмов взаимодействия
+					- сложно поддерживаемое решение
+					- данные хранятся в самом компоненте и исчезают после удаления из DOM
+					</script>
+				</section>
+
+				<section>
+					<h1>3. Backbone</h1>
+					<pre><code class="hljs" data-trim>
+					const User = Backbone.Model.extend({
+						urlRoot: '/api/user',
+						defaults: { name: '', status: '' }
+					});
+
+					const View = Backbone.View.extend({
+						model: User,
+						initialize(options) {
+							this.listenTo(this.model, 'change', this.render);
+							this.model.fetch();
+						}
+						render() {
+							this.$el.html(`
+								<div>
+									<span>${this.model.get('name')}</span>
+									<span>${this.model.get('status')}</span>
+								</div>
+							`);
+						}
+					});
+					</code></pre>
+				</section>
+
+				<section data-markdown>
+					<script type="text/template">
+					# 3.1 Backbone (Плюсы)
+
+					- Модель данных отделена от представления
+					- Есть модель данных
+					</script>
+				</section>
+
+				<section data-markdown>
+					<script type="text/template">
+					# 3.2 Backbone (Минусы)
+
+					- Event-emitter ?!
+					- Большой overhead
+					- Малая гибкость
+					</script>
+				</section>
+
+				<section>
+					<h1>4. React + Redux</h1>
+					<section>
+						<pre><code class="hljs" data-trim>
+						import { connect } from 'react-redux';
+						import { fetchUser } from './action'
+
+						class User extends React.Component {
+							componentDidMount() { this.props.load(); }
+							render() {
+								const { name, status } = this.props;
+								return (<div><span>{name}</span><span>{status}</span></div>);
+							}
+						}
+						const UserSmart = connect(state => state.user,
+							dispatch => ({ load: () => dispatch(fetchUser()) }))
+						</code></pre>
+					</section>
+					<section>
+						<pre><code class="hljs" data-trim>
+						export function fetchUser() {
+							return function(dispatch) {
+								dispatch({ type: 'FETCH_USER' });
+								return fetch('/api/user').then(d => d.json())
+									.then(
+										data => dispatch({ type: 'SUCCESS_USER', data }),
+										error => dispatch({ type: 'ERROR_USER', error })
+									);
+							}
+						}
+					</code></pre>
+				</section>
+
+				<section>
+					<pre><code class="hljs" data-trim>
+						function rootReducer(state, action) {
+							if (action.type === 'FETCH_USER') {
+								return { ...state, user: { loading: true }};
+							} else if (action.type === 'SUCCESS_USER') {
+								return { ...state, user: { loading: false, data: action.data }};
+							} else if (action.type === 'ERROR_USER') {
+								return { ...state, user:  { loading: false, error: action.error }};
+							} else {
+								return state;
+							}
+						}
+						import thunk from 'redux-thunk';
+						import { createStore, applyMiddleware } from 'redux';
+						const store = createStore(rootReducer, applyMiddleware(thunk));
+						</code></pre>
+					</section>
+				</section>
+
+				<section data-markdown>
+					<script type="text/template">
+					# 4.1 React + Redux (Плюсы)
+
+					- понятность подхода
+					- хорошая поддержка dev-tools
+					</script>
+				</section>
+
+				<section data-markdown>
+					<script type="text/template">
+					# 4.2 React + Redux (Минусы)
+
+					- излишняя многословность
+					- переусложненый flow при большом количестве асинхронных операций
+					- низкоуровневость подхода
+					</script>
+				</section>
+
+				<section>
+					<h1>5. React + redux-api</h1>
+					<section>
+						<a href="https://github.com/lexich/redux-api" target="_blank">redux-api</a>
+						<pre><code class="hljs" data-trim>
+						import { connect } from 'react-redux';
+						import { rest } from './store';
+
+						class User extends React.Component {
+							componentDidMount() { this.props.load(); }
+							render() {
+								const { data, error, loading } = this.props;
+								if (loading) {
+									return <div>Loading</div>
+								} else if (error) {
+									return <div>Error: {error.message}</div>
+								} else {
+									const data = { name, status };
+									return (<div><span>{name}</span><span>{status}</span></div>);
+								}
+							}
+						}
+						const UserSmart = connect(state => state.user,
+							dispatch => ({ load: () => dispatch(rest.action.user()) }))
+						</code></pre>
+					</section>
+					<section>
+						<a href="https://github.com/lexich/redux-api" target="_blank">redux-api</a>
+						<pre><code class="hljs" data-trim>
+						import reduxApi from 'redux-api';
+						import adapterFetch from 'redux-api/lib/adapters/fetch';
+						import thunk from 'redux-thunk';
+						import { createStore, applyMiddleware } from 'redux';
+
+						/* redux-api initialization */
+						export const rest = reduxApi({ user: '/api/user' });
+						rest.use('fetch', adapterFetch(fetch));
+
+						/* integrate redux-api to redux flow */
+						export const store = createStore(rest.reducer, applyMiddleware(thunk));
+						</code></pre>
+					</section>
+				</section>
+
+				<section data-markdown>
+					<script type="text/template">
+					# 5.1 React + Redux-api (Плюсы)
+
+					- плюсы классического redux подхода
+					- декларативность
+					- значительное уменьшение boilerplate кода
+					- redux-api это всего лишь генератор actions и reducers
+					- идеально подходит для множественных CRUD операций
+					</script>
+				</section>
+
+				<section data-markdown>
+					<script type="text/template">
+					# 5.2 React + Redux-api (Минусы)
+
+					- Не всегда очевидный api для сложных flow
+					- Нет поддержки типов
+					</script>
+				</section>
+				<section>
+					<h1>Jsconf Iceland 2018 <a href="https://2018.jsconf.is" target="_blank">link</a></h1>
+					<a href="https://www.youtube.com/watch?v=nLF0n9SACd4" target="_blank">Dan Abramov: Beyond React 16 </a>
+				</section>
+				<section>
+					<h1>6. React + react-async-decorator</h1>
+					<a href="https://github.com/lexich/react-async-decorator" target="_blank">react-async-decorator</a>
+					<pre><code class="hljs" data-trim>
+					import { asyncClass, initFetchers } from 'react-async-decorator';
+					const createFetcher = initFetchers();
+					const fetcher = createFetcher(() =>
+						fetch('/api/user').then(d => d.json()));
+
+					@asyncClass(fetcher)
+					class User extends React.Component {
+						render() {
+							const { name, status } = fetcher.get();
+							return (
+								<div>
+									<span>{name}</span>
+									<span>{status}</span>
+								</div>
+							);
+						}
+					}
+					</code></pre>
+				</section>
+
+				<section data-markdown>
+					<script type="text/template">
+					# 6.1 React + react-async-decorator (Плюсы)
+
+					- синхронный стиль написания кода
+					- малое количество boilerplate кода
+					- возможность работы как с redux store так и без него
+					- typescript first
+					- поддержка server-rendering
+					</script>
+				</section>
+
+				<section data-markdown>
+					<script type="text/template">
+					# 6.2 React + react-async-decorator (Минусы)
+
+					- проблемы Beta версии
+					- нестабильный API
+					- (пока) плохая документация
+					</script>
+				</section>
+				<section>
+					<h1>Выводы</h1>
+				</section>
+				<section>
+					<h1>Вопросы к <span style="color: pink;">Бусе</span></h1>
+					<img width="45%" src="img/final.jpg" />
+					<p>и докладчику</p>
+					<h2>Спасибо за внимание</h2>
+				</section>
+			</div>
+		</div>
+
+		<script src="lib/js/head.min.js"></script>
+		<script src="js/reveal.js"></script>
+
+		<script>
+			// More info about config & dependencies:
+			// - https://github.com/hakimel/reveal.js#configuration
+			// - https://github.com/hakimel/reveal.js#dependencies
+			Reveal.initialize({
+				controls: true,
+				progress: true,
+				history: true,
+				center: true,
+
+				transition: 'slide', // none/fade/slide/convex/concave/zoom
+
+				dependencies: [
+					{ src: 'plugin/markdown/marked.js' },
+					{ src: 'plugin/markdown/markdown.js' },
+					{ src: 'plugin/notes/notes.js', async: true },
+					{ src: 'plugin/highlight/highlight.js', async: true, callback: function() { hljs.initHighlightingOnLoad(); } }
+				]
+			});
+
+		</script>
+	</body>
+</html>
